@@ -31,6 +31,7 @@
 
 #include <mutex>
 #include <opencv2/opencv.hpp>
+#include <Eigen/Dense>
 
 namespace ORB_SLAM3
 {
@@ -42,6 +43,17 @@ class KeyFrame;
 class ConstraintPoseImu;
 class GeometricCamera;
 class ORBextractor;
+
+class objectdetection {
+public:
+    using pos_t = std::tuple<float, float, float>;
+
+    using object_t = std::tuple<float, signed long int, signed long int, signed long int, signed long int, signed short int, std::string, float>;
+
+    void add_object(float probability, signed long int x_cen, signed long int y_cen, signed long int width, signed long int height, signed short int id, std::string Class, float depth);
+
+    std::vector<object_t> objects_;
+};
 
 class Frame
 {
@@ -55,7 +67,7 @@ public:
     Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth, GeometricCamera* pCamera,Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
 
     // Constructor for RGB-D cameras.
-    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth, GeometricCamera* pCamera,Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
+    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth, GeometricCamera* pCamera, const ORB_SLAM3::objectdetection& objects = ORB_SLAM3::objectdetection{},Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
 
     // Constructor for Monocular cameras.
     Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
@@ -123,6 +135,8 @@ public:
 
     bool imuIsPreintegrated();
     void setIntegrated();
+
+    void create_labels_vector(const ORB_SLAM3::objectdetection &objects);
 
     cv::Mat mRwc;
     cv::Mat mOw;
@@ -234,6 +248,14 @@ public:
     static float mnMinY;
     static float mnMaxY;
 
+    //! labels
+    // enum label_t { chair, book, bottle, tvmonitor, mouse, keyboard, cup};
+    // const char *target_labels[sizeof(label_t)] = {"chair", "book", "bottle", "tvmonitor", "mouse", "keyboard", "cup"};
+    // std::vector<std::string> target_labels_{"chair", "book", "bottle", "tvmonitor", "mouse", "keyboard", "cup"};
+    #define MAX_OBJECT_NUM 10
+    Eigen::Array<float,MAX_OBJECT_NUM,1> labels_;
+
+    
     static bool mbInitialComputations;
 
     map<long unsigned int, cv::Point2f> mmProjectPoints;

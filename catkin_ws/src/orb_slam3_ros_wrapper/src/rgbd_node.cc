@@ -13,7 +13,7 @@ class ImageGrabber
 public:
     ImageGrabber(ORB_SLAM3::System* pSLAM):mpSLAM(pSLAM){}
 
-    void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD);
+    void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD, const sem_img_msg::centerBdboxes::ConstPtr& bdbox);
 
     ORB_SLAM3::System* mpSLAM;
 };
@@ -51,9 +51,10 @@ int main(int argc, char **argv)
 
     message_filters::Subscriber<sensor_msgs::Image> rgb_sub(node_handler, "/camera/rgb/image_raw", 100);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(node_handler, "/camera/depth_registered/image_raw", 100);
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
-    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub, depth_sub);
-    sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD,&igb,_1,_2));
+    message_filters::Subscriber<sem_img_msg::centerBdboxes> bdbox_sf_(node_handler, "/camera/boundingbox", 100);
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sem_img_msg::centerBdboxes> sync_pol;
+    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub, depth_sub, bdbox_sf_);
+    sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD,&igb,_1,_2,_3));
 
     pose_pub = node_handler.advertise<geometry_msgs::PoseStamped> ("/orb_slam3_ros/camera", 1);
 
@@ -71,7 +72,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD)
+void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD, const sem_img_msg::centerBdboxes::ConstPtr &bdbox)
 {
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptrRGB;
@@ -95,9 +96,17 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
-    
+
+    ORB_SLAM3::objectdetection objects;
+    for (unsigned int i = 0; i < bdbox->centerBdboxes.size(); i++)
+    {
+        objects.add_object(bdbox->centerBdboxes[i].probability, bdbox->centerBdboxes[i].x_cen, bdbox->centerBdboxes[i].y_cen, bdbox->centerBdboxes[i].width, bdbox->centerBdboxes[i].height, bdbox->centerBdboxes[i].id, bdbox->centerBdboxes[i].Class, bdbox->centerBdboxes[i].depth);
+        // if (bdbox->centerBdboxes[i].depth != -1)
+        //     ROS_INFO("bdbox->centerBdboxes[i].Class %s bdbox->centerBdboxes[i].depth %f", bdbox->centerBdboxes[i].Class.c_str(), bdbox->centerBdboxes[i].depth);
+    }
+
     // Main algorithm runs here
-    cv::Mat Tcw = mpSLAM->TrackRGBD(cv_ptrRGB->image, cv_ptrD->image, cv_ptrRGB->header.stamp.toSec());
+    cv::Mat Tcw = mpSLAM->TrackRGBD(cv_ptrRGB->image, cv_ptrD->image, cv_ptrRGB->header.stamp.toSec(), objects);
 
     ros::Time current_frame_time = cv_ptrRGB->header.stamp;
 

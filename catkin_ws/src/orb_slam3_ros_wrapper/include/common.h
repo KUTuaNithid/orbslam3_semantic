@@ -23,6 +23,9 @@
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
+#include <sem_img_msg/centerBdbox.h>
+#include <sem_img_msg/centerBdboxes.h>
+
 // ORB-SLAM3-specific libraries. Directory is defined in CMakeLists.txt: ${ORB_SLAM3_DIR}
 #include "include/System.h"
 #include "include/ImuTypes.h"
