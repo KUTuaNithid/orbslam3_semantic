@@ -19,6 +19,7 @@ find_package (catkin REQUIRED COMPONENTS
    tf
    sensor_msgs
    message_generation
+   sem_img_msg
 )
 
 find_package(OpenCV REQUIRED)
